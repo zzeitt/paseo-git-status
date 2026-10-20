@@ -13,6 +13,11 @@ type Paseo = PluginClientContext["paseo"];
 type AgentList = Awaited<ReturnType<Paseo["agents"]["list"]>>;
 type AgentUpdate = Parameters<Parameters<Paseo["agents"]["subscribe"]>[0]>[0];
 type AgentObservation = NonNullable<AgentList["subscription"]>;
+type WorkspaceList = Awaited<ReturnType<Paseo["workspaces"]["list"]>>;
+type WorkspaceUpdate = Parameters<
+  Parameters<Paseo["workspaces"]["subscribe"]>[0]
+>[0];
+type WorkspaceObservation = NonNullable<WorkspaceList["subscription"]>;
 
 const RETRY_MIN_MS = 2_000;
 const RETRY_MAX_MS = 60_000;
@@ -20,6 +25,13 @@ const RETRY_MAX_MS = 60_000;
 /** The registration is created from the icon, so the icon reaches it here. */
 interface RegistrationBox {
   current?: PluginButtonRegistration;
+}
+
+interface PillState {
+  workspaceId: string;
+  registration: PluginButtonRegistration;
+  /** True when a workspace-kind check hid the pill, not the git read. */
+  hiddenByWorkspace: boolean;
 }
 
 function createPillIcon(registration: RegistrationBox) {
@@ -80,15 +92,43 @@ function createPillIcon(registration: RegistrationBox) {
  * read.
  */
 export function contributePills(client: PluginClientContext) {
-  const pills = new Map<
+  const pills = new Map<string, PillState>();
+  const workspaceKinds = new Map<
     string,
-    { workspaceId: string; registration: PluginButtonRegistration }
+    "git" | "non_git" | "directory"
   >();
   const lifetime = new AbortController();
   let stopped = false;
   let observation: AgentObservation | null = null;
+  let workspaceObservation: WorkspaceObservation | null = null;
   let retry: ReturnType<typeof setTimeout> | null = null;
   let retryDelay = RETRY_MIN_MS;
+
+  /**
+   * A pill can be hidden because Paseo says the workspace is not a repository,
+   * or because the git read said the directory is not one. Only the first case
+   * is undone when the workspace becomes a repository, so the two are tracked
+   * separately and a workspace update re-arms the read.
+   */
+  function syncWorkspacePills(workspaceId: string) {
+    const kind = workspaceKinds.get(workspaceId);
+    if (!kind) return;
+    for (const pill of pills.values()) {
+      if (pill.workspaceId !== workspaceId) continue;
+      if (kind === "non_git") {
+        pill.registration.update({ visible: false });
+        pill.hiddenByWorkspace = true;
+      } else if (kind === "git") {
+        pill.registration.update({ visible: true });
+        pill.hiddenByWorkspace = false;
+      } else if (pill.hiddenByWorkspace) {
+        // A plain directory can become a repository later. Let the icon mount
+        // and read it again; it hides itself if the read still says no.
+        pill.registration.update({ visible: true });
+        pill.hiddenByWorkspace = false;
+      }
+    }
+  }
 
   function removePill(agentId: string) {
     pills.get(agentId)?.registration.remove();
@@ -113,7 +153,14 @@ export function contributePills(client: PluginClientContext) {
         behavior: { kind: "popover", Content: GitStatusPopover },
       },
     });
-    pills.set(agentId, { workspaceId, registration: box.current });
+    const hiddenByWorkspace =
+      workspaceKinds.get(workspaceId) === "non_git";
+    pills.set(agentId, {
+      workspaceId,
+      registration: box.current,
+      hiddenByWorkspace,
+    });
+    if (hiddenByWorkspace) box.current.update({ visible: false });
   }
 
   function applySnapshot(list: AgentList) {
@@ -138,8 +185,30 @@ export function contributePills(client: PluginClientContext) {
     }
   }
 
+  function applyWorkspaceSnapshot(list: WorkspaceList) {
+    if (stopped) return;
+    for (const workspace of list.entries) {
+      workspaceKinds.set(workspace.id, workspace.projectKind);
+    }
+    for (const pill of pills.values()) {
+      syncWorkspacePills(pill.workspaceId);
+    }
+  }
+
+  function applyWorkspaceUpdate(update: WorkspaceUpdate) {
+    if (update.kind === "remove") {
+      workspaceKinds.delete(update.id);
+      return;
+    }
+    workspaceKinds.set(update.workspace.id, update.workspace.projectKind);
+    syncWorkspacePills(update.workspace.id);
+  }
+
   function reopen(error: unknown) {
+    void observation?.release().catch(() => undefined);
+    void workspaceObservation?.release().catch(() => undefined);
     observation = null;
+    workspaceObservation = null;
     if (stopped || retry !== null) return;
     console.warn("paseo-git-status: agent observation failed; reopening", error);
     retry = setTimeout(() => {
@@ -151,15 +220,17 @@ export function contributePills(client: PluginClientContext) {
 
   async function open() {
     try {
-      const result = await client.paseo.agents.list({
+      const agents = await client.paseo.agents.list({
         subscribe: {},
         signal: lifetime.signal,
       });
       if (lifetime.signal.aborted) return;
-      const subscription = result.subscription;
-      if (!subscription) throw new Error("The host returned no agent observation.");
-      observation = subscription;
-      subscription.subscribe({
+      const agentSubscription = agents.subscription;
+      if (!agentSubscription) {
+        throw new Error("The host returned no agent observation.");
+      }
+      observation = agentSubscription;
+      agentSubscription.subscribe({
         snapshot(list) {
           retryDelay = RETRY_MIN_MS;
           applySnapshot(list);
@@ -167,6 +238,25 @@ export function contributePills(client: PluginClientContext) {
         update(message) {
           if (message.type === "agent_update") {
             applyUpdate(message.payload as AgentUpdate);
+          }
+        },
+        error: reopen,
+      });
+
+      const workspaces = await client.paseo.workspaces.list({ subscribe: {} });
+      if (lifetime.signal.aborted) return;
+      const workspaceSubscription = workspaces.subscription;
+      if (!workspaceSubscription) {
+        throw new Error("The host returned no workspace observation.");
+      }
+      workspaceObservation = workspaceSubscription;
+      workspaceSubscription.subscribe({
+        snapshot(list) {
+          applyWorkspaceSnapshot(list);
+        },
+        update(message) {
+          if (message.type === "workspace_update") {
+            applyWorkspaceUpdate(message.payload as WorkspaceUpdate);
           }
         },
         error: reopen,
@@ -184,7 +274,9 @@ export function contributePills(client: PluginClientContext) {
     if (retry !== null) clearTimeout(retry);
     retry = null;
     void observation?.release().catch(() => undefined);
+    void workspaceObservation?.release().catch(() => undefined);
     observation = null;
+    workspaceObservation = null;
     for (const pill of pills.values()) pill.registration.remove();
     pills.clear();
   };
