@@ -1,0 +1,9 @@
+{
+  "id": "paseo-git-status",
+  "name": "Git Status",
+  "description": "Shows the current worktree, branch, and uncommitted changes in the Paseo composer",
+  "media": [],
+  "requirements": {
+    "paseo": ">=0.12.0"
+  }
+}

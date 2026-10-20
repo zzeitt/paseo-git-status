@@ -1,0 +1,50 @@
+{
+  "name": "paseo-git-status",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Git status in the Paseo composer: current worktree, branch, staged/unstaged changes, and the other worktrees in the repository",
+  "license": "MIT",
+  "homepage": "https://github.com/zzeitt/paseo-git-status#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zzeitt/paseo-git-status.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zzeitt/paseo-git-status/issues"
+  },
+  "keywords": [
+    "paseo",
+    "paseo-plugin",
+    "git",
+    "git-status",
+    "worktree"
+  ],
+  "files": [
+    "paseo-plugin.json",
+    "OVERVIEW.md",
+    "README.md",
+    "LICENSE",
+    "index.client.ts",
+    "index.client.tsx",
+    "index.server.ts",
+    "index.server.tsx",
+    "client/",
+    "server/",
+    "shared/"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test shared/parse.test.ts"
+  },
+  "devDependencies": {
+    "@getpaseo/plugin": "0.12.0",
+    "@tanstack/react-query": "^5.90.11",
+    "@types/node": "^26.6.5",
+    "@types/react": "~19.2.0",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "typescript": "^5.9.3",
+    "zod": "^4.4.3"
+  }
+}
