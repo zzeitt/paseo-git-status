@@ -28,6 +28,14 @@ Pin a revision with `--ref`, and target another daemon with `--host`:
 paseo plugin add git:zzeitt/paseo-git-status --ref v0.1.0 --host <host>
 ```
 
+If HTTPS access to GitHub is blocked, or the daemon host routes Git HTTPS through an unavailable proxy, install from the SSH URL instead:
+
+```bash
+paseo plugin add git@github.com:zzeitt/paseo-git-status.git
+```
+
+SSH requires a GitHub SSH key on the daemon host.
+
 Then reload the app if the composer does not show the pill immediately.
 
 ## Development
