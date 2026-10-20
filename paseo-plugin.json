@@ -4,6 +4,6 @@
   "description": "Shows the current worktree, branch, and uncommitted changes in the Paseo composer",
   "media": [],
   "requirements": {
-    "paseo": ">=0.12.0"
+    "paseo": ">=0.11.4"
   }
 }

@@ -10,4 +10,4 @@ The pill names the worktree first, then the branch. A trailing marker shows unco
 
 The plugin reads git locally through the `git` executable on the daemon machine. It does not run write operations, contact a remote, or fetch. Status is refreshed every five seconds while the composer is visible and every three seconds while the popover is open.
 
-The pill is hidden for workspaces Paseo identifies as non-git, and it hides itself if a directory turns out not to be a repository. Git must be installed and available on the daemon's PATH. Paseo 0.12.0 or later is required.
+The pill is hidden for workspaces Paseo identifies as non-git, and it hides itself if a directory turns out not to be a repository. Git must be installed and available on the daemon's PATH. Paseo 0.11.4 or later is required on the daemon and on the client showing the composer.

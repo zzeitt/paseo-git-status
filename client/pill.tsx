@@ -197,7 +197,10 @@ export function contributePills(client: PluginClientContext) {
 
   function applyWorkspaceUpdate(update: WorkspaceUpdate) {
     if (update.kind === "remove") {
-      workspaceKinds.delete(update.id);
+      // 0.11 and 0.12 name the removed workspace differently.
+      const removed = update as unknown as { id?: string; workspaceId?: string };
+      const removedId = removed.id ?? removed.workspaceId;
+      if (removedId) workspaceKinds.delete(removedId);
       return;
     }
     workspaceKinds.set(update.workspace.id, update.workspace.projectKind);

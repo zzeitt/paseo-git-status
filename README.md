@@ -11,7 +11,7 @@ The pill is registered per agent, so it answers the question that matters while 
 
 ## Requirements
 
-- Paseo 0.12.0 or later on the daemon.
+- Paseo 0.11.4 or later on the daemon and on the client (desktop, web, or mobile).
 - `git` available on the daemon's `PATH`.
 
 ## Install
