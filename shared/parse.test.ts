@@ -214,7 +214,23 @@ test("formats a plain pill label", () => {
       dirty: false,
       conflicted: 0,
     }),
-    "paseo-git-status · main",
+    "paseo-git-status",
+  );
+});
+
+test("keeps the branch when the worktree leaves room for it", () => {
+  assert.equal(
+    formatPillLabel({
+      worktreeName: "rainmeter-sp",
+      branch: "main",
+      head: OID,
+      detached: false,
+      ahead: 0,
+      behind: 0,
+      dirty: true,
+      conflicted: 0,
+    }),
+    "rainmeter-sp* · main",
   );
 });
 
@@ -230,7 +246,7 @@ test("formats ahead, behind, dirty and conflict markers", () => {
       dirty: true,
       conflicted: 0,
     }),
-    "paseo-git-status · main ↑2↓1*",
+    "paseo-git-status* ↑2↓1",
   );
   assert.equal(
     formatPillLabel({
@@ -243,7 +259,7 @@ test("formats ahead, behind, dirty and conflict markers", () => {
       dirty: true,
       conflicted: 1,
     }),
-    "paseo-git-status · main*!",
+    "paseo-git-status*!",
   );
 });
 
@@ -288,6 +304,6 @@ test("truncates long worktree and branch names", () => {
       dirty: false,
       conflicted: 0,
     }),
-    "a-very-long-worktre… · feature/a-very-long-branch-…",
+    "a-very-long-worktre…",
   );
 });

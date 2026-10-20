@@ -266,18 +266,24 @@ export interface PillLabelInput {
  */
 export function formatPillLabel(input: PillLabelInput): string {
   const name = truncate(input.worktreeName, 20);
-  const branch = truncate(
-    input.branch ?? (input.head ? `@${input.head.slice(0, 7)}` : "(no commits)"),
-    28,
-  );
+  const branch =
+    input.branch ?? (input.head ? `@${input.head.slice(0, 7)}` : "(no commits)");
   const divergence = [
     input.ahead ? `↑${input.ahead}` : "",
     input.behind ? `↓${input.behind}` : "",
   ].join("");
   const divergenceText = divergence ? ` ${divergence}` : "";
-  const dirty = input.dirty ? "*" : "";
-  const conflict = input.conflicted > 0 ? "!" : "";
-  return `${name} · ${branch}${divergenceText}${dirty}${conflict}`;
+  // Markers sit directly after the worktree so the narrow composer track does
+  // not hide them behind the branch.
+  const base = `${name}${input.dirty ? "*" : ""}${
+    input.conflicted > 0 ? "!" : ""
+  }${divergenceText}`;
+  // The Git pill is usually the last item in a narrow track. Keep the branch
+  // only when the worktree and its markers leave room for it; the popover
+  // always has the full branch.
+  return base.length + 3 + branch.length <= 22
+    ? `${base} · ${branch}`
+    : base;
 }
 
 function truncate(value: string, max: number): string {
