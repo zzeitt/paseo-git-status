@@ -25,6 +25,7 @@
     "OVERVIEW.md",
     "README.md",
     "LICENSE",
+    "assets/",
     "index.client.ts",
     "index.client.tsx",
     "index.server.ts",

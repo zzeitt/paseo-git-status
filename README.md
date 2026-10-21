@@ -4,6 +4,8 @@ A [Paseo](https://paseo.sh) plugin that puts the current git status in the compo
 
 The pill is registered per agent, so it answers the question that matters while a conversation is open: which worktree and branch is this session working in?
 
+![The composer pill and Git Status popover, shown with a sample repository](assets/screenshot.png)
+
 - The label names the git worktree first, then the branch. `*` means uncommitted changes, `!` means conflicts, and `↑n↓m` shows divergence from the upstream.
 - Non-git workspaces hide the pill.
 - The popover shows the current worktree path and whether it is the main or a linked worktree, every worktree in the repository, branch and upstream state, staged/unstaged/untracked/conflicted files, the last commit, the stash count, and any merge, rebase, cherry-pick, revert, or bisect in progress.
