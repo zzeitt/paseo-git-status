@@ -4,6 +4,7 @@ import {
   formatPillLabel,
   parsePorcelainV2,
   parseWorktreeList,
+  resolveGitDirectory,
   summarize,
 } from "./parse.ts";
 
@@ -200,6 +201,20 @@ test("marks no worktree current when the path is unknown", () => {
   );
   assert.equal(worktrees[0].isCurrent, false);
   assert.equal(worktrees[0].isMain, true);
+});
+
+test("prefers the agent cwd over the workspace directory", () => {
+  assert.equal(
+    resolveGitDirectory("C:/repo-wt", "C:/repo"),
+    "C:/repo-wt",
+  );
+  assert.equal(
+    resolveGitDirectory("  C:/repo-wt  ", "C:/repo"),
+    "C:/repo-wt",
+  );
+  assert.equal(resolveGitDirectory(null, "C:/repo"), "C:/repo");
+  assert.equal(resolveGitDirectory("", "C:/repo"), "C:/repo");
+  assert.equal(resolveGitDirectory(null, null), null);
 });
 
 test("formats a plain pill label", () => {

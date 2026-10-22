@@ -249,6 +249,24 @@ export function summarize(status: PorcelainStatus): StatusCounts {
   };
 }
 
+/**
+ * The directory whose git state a session should show.
+ *
+ * An agent can have its own cwd that differs from its workspace directory, for
+ * example after a fork or a move into a linked worktree. The agent cwd is the
+ * session's real location, so it wins; the workspace directory is the fallback
+ * for clients that do not expose an agent cwd.
+ */
+export function resolveGitDirectory(
+  agentCwd: string | null | undefined,
+  workspaceDirectory: string | null | undefined,
+): string | null {
+  const agent = agentCwd?.trim();
+  if (agent) return agent;
+  const workspace = workspaceDirectory?.trim();
+  return workspace || null;
+}
+
 export interface PillLabelInput {
   worktreeName: string;
   branch: string | null;

@@ -1,4 +1,5 @@
 import type { PluginButtonContentProps } from "@getpaseo/plugin/client";
+import { useAgent } from "@getpaseo/plugin/client";
 import {
   Icon,
   ScrollView,
@@ -10,7 +11,7 @@ import type {
   GitStatus,
   GitWorktree,
 } from "../shared/git-status";
-import { isConflicted } from "../shared/parse";
+import { isConflicted, resolveGitDirectory } from "../shared/parse";
 import {
   POPOVER_POLL_MS,
   useGitStatus,
@@ -21,8 +22,12 @@ const FILE_LIMIT = 30;
 
 export function GitStatusPopover(props: PluginButtonContentProps) {
   const { theme, layout, workspaceId } = props;
+  const agentId = "agentId" in props ? props.agentId : "";
   const workspace = useWorkspaceInfo(workspaceId);
-  const query = useGitStatus(workspace?.directory, POPOVER_POLL_MS);
+  const agentCwd = useAgent(agentId, (snapshot) => snapshot.cwd);
+  const directory =
+    resolveGitDirectory(agentCwd, workspace?.directory) ?? undefined;
+  const query = useGitStatus(directory, POPOVER_POLL_MS);
   const status = query.data;
   const workspaceName = workspace?.title || workspace?.name || "";
   const styles = useMemo(

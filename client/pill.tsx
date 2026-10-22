@@ -3,9 +3,10 @@ import type {
   PluginButtonRegistration,
   PluginClientContext,
 } from "@getpaseo/plugin/client";
+import { useAgent } from "@getpaseo/plugin/client";
 import { Icon } from "@getpaseo/plugin/client/react-native";
 import { useEffect } from "react";
-import { formatPillLabel } from "../shared/parse";
+import { formatPillLabel, resolveGitDirectory } from "../shared/parse";
 import { PILL_POLL_MS, useGitStatus, useWorkspaceInfo } from "./git-status-query";
 import { GitStatusPopover } from "./popover";
 
@@ -35,17 +36,24 @@ interface PillState {
 }
 
 function createPillIcon(registration: RegistrationBox) {
-  return function GitStatusPillIcon({
-    size,
-    color,
-    workspaceId,
-  }: PluginButtonIconProps) {
+  return function GitStatusPillIcon(props: PluginButtonIconProps) {
+    const { size, color, workspaceId } = props;
+    // Composer pills are agent-scoped, but the shared button props are a union
+    // with the workspace variant.
+    const agentId = "agentId" in props ? props.agentId : "";
     const workspace = useWorkspaceInfo(workspaceId);
-    const definitelyNotGit = workspace?.projectKind === "non_git";
+    // A forked or moved agent can have a cwd outside its workspace directory.
+    // The session's git state follows the agent, not the workspace.
+    const agentCwd = useAgent(agentId, (snapshot) => snapshot.cwd);
+    const directory =
+      resolveGitDirectory(agentCwd, workspace?.directory) ?? undefined;
+    const definitelyNotGit =
+      workspace?.projectKind === "non_git" &&
+      directory === workspace?.directory;
     const query = useGitStatus(
-      workspace?.directory,
+      directory,
       PILL_POLL_MS,
-      Boolean(workspace) && !definitelyNotGit,
+      Boolean(directory) && !definitelyNotGit,
     );
     const status = query.data;
     const current = status?.current ?? null;
