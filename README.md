@@ -55,7 +55,7 @@ paseo plugin install /absolute/path/to/paseo-git-status
 paseo plugin reload paseo-git-status
 ```
 
-The plugin entry points are `index.client.tsx` and `index.server.ts`. The daemon-side RPC is `gitstatus.get` in `shared/git-status.ts`; it runs `git worktree list --porcelain`, `git status --porcelain=v2 --branch -z`, `git log -1`, and `git stash list` in the agent's workspace directory.
+The plugin entry points are `index.client.tsx` and `index.server.ts`. The daemon-side RPC is `gitstatus.get` in `shared/git-status.ts`; it runs `git worktree list --porcelain`, `git status --porcelain=v2 --branch -z`, `git log -1`, and `git stash list` in the agent's working directory, falling back to its workspace directory when no agent cwd is available.
 
 ## License
 
