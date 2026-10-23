@@ -36,7 +36,7 @@
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test shared/parse.test.ts"
+    "test": "node --experimental-strip-types --test shared/parse.test.ts shared/worktree-action.test.ts server/live-cwd.test.ts"
   },
   "devDependencies": {
     "@getpaseo/plugin": "0.12.0",

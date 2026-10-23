@@ -1,10 +1,13 @@
-import type { PluginButtonContentProps } from "@getpaseo/plugin/client";
+import type {
+  PluginButtonContentProps,
+  PluginClientContext,
+} from "@getpaseo/plugin/client";
 import { useAgent } from "@getpaseo/plugin/client";
 import {
   Icon,
   ScrollView,
 } from "@getpaseo/plugin/client/react-native";
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Pressable, Text, View } from "react-native";
 import type {
   GitChange,
@@ -13,6 +16,13 @@ import type {
 } from "../shared/git-status";
 import { isConflicted, resolveGitDirectory } from "../shared/parse";
 import {
+  enterWorktreePrompt,
+  exitWorktreePrompt,
+  worktreeAction,
+  type WorktreeAction,
+  type WorktreeActionInput,
+} from "../shared/worktree-action";
+import {
   POPOVER_POLL_MS,
   useGitStatus,
   useWorkspaceInfo,
@@ -20,14 +30,20 @@ import {
 
 const FILE_LIMIT = 30;
 
-export function GitStatusPopover(props: PluginButtonContentProps) {
-  const { theme, layout, workspaceId } = props;
+type Paseo = PluginClientContext["paseo"];
+
+export function GitStatusPopover(
+  props: PluginButtonContentProps & { paseo: Paseo },
+) {
+  const { theme, layout, workspaceId, paseo } = props;
   const agentId = "agentId" in props ? props.agentId : "";
   const workspace = useWorkspaceInfo(workspaceId);
   const agentCwd = useAgent(agentId, (snapshot) => snapshot.cwd);
+  const agentStatus = useAgent(agentId, (snapshot) => snapshot.status);
+  const agentProvider = useAgent(agentId, (snapshot) => snapshot.provider);
   const directory =
     resolveGitDirectory(agentCwd, workspace?.directory) ?? undefined;
-  const query = useGitStatus(directory, POPOVER_POLL_MS);
+  const query = useGitStatus(directory, agentId || undefined, POPOVER_POLL_MS);
   const status = query.data;
   const workspaceName = workspace?.title || workspace?.name || "";
   const styles = useMemo(
@@ -49,7 +65,16 @@ export function GitStatusPopover(props: PluginButtonContentProps) {
         ) : !status.isGit ? (
           <Text style={styles.muted}>Not a git repository.</Text>
         ) : (
-          <Body status={status} workspaceName={workspaceName} styles={styles} theme={theme} />
+          <Body
+            status={status}
+            workspaceName={workspaceName}
+            styles={styles}
+            theme={theme}
+            agentId={agentId}
+            agentStatus={agentStatus}
+            provider={agentProvider}
+            paseo={paseo}
+          />
         )}
         {query.error ? (
           <Text style={styles.error}>{errorText(query.error)}</Text>
@@ -82,8 +107,21 @@ function Body(props: {
   workspaceName: string;
   styles: Styles;
   theme: PluginButtonContentProps["theme"];
+  agentId: string;
+  agentStatus: WorktreeActionInput["agentStatus"];
+  provider: string | null;
+  paseo: Paseo;
 }) {
-  const { status, workspaceName, styles, theme } = props;
+  const {
+    status,
+    workspaceName,
+    styles,
+    theme,
+    agentId,
+    agentStatus,
+    provider,
+    paseo,
+  } = props;
   const current = status.current;
   const staged = status.changes.filter(
     (change) => !isConflicted(change) && change.index !== ".",
@@ -114,6 +152,11 @@ function Body(props: {
         {current ? (
           <Text style={styles.path} selectable numberOfLines={2}>
             {current.path}
+          </Text>
+        ) : null}
+        {status.liveCwd && status.liveCwd !== status.paseoDirectory ? (
+          <Text style={styles.mutedSmall} selectable numberOfLines={2}>
+            Paseo cwd · {status.paseoDirectory}
           </Text>
         ) : null}
         {workspaceName ? (
@@ -226,39 +269,15 @@ function Body(props: {
 
       {status.worktrees.length > 1 ? (
         <Section title="Worktrees" styles={styles}>
-          {status.worktrees.map((worktree) => (
-            <View key={worktree.path} style={styles.worktreeRow}>
-              <Text
-                style={[
-                  styles.worktreeDot,
-                  {
-                    color: worktree.isCurrent
-                      ? theme.colors.accent
-                      : theme.colors.foregroundMuted,
-                  },
-                ]}
-              >
-                {worktree.isCurrent ? "●" : "○"}
-              </Text>
-              <Text
-                style={
-                  worktree.isCurrent
-                    ? styles.worktreeCurrent
-                    : styles.worktreeNameRow
-                }
-                numberOfLines={1}
-              >
-                {worktree.name}
-              </Text>
-              <Text style={styles.worktreeBranch} numberOfLines={1}>
-                {worktree.branch ??
-                  (worktree.head ? `@${worktree.head.slice(0, 7)}` : "")}
-              </Text>
-              {worktree.isMain ? (
-                <Text style={styles.worktreeTag}>main</Text>
-              ) : null}
-            </View>
-          ))}
+          <WorktreeList
+            worktrees={status.worktrees}
+            agentId={agentId}
+            agentStatus={agentStatus}
+            provider={provider}
+            paseo={paseo}
+            styles={styles}
+            theme={theme}
+          />
         </Section>
       ) : null}
 
@@ -280,6 +299,156 @@ function Body(props: {
       ) : null}
     </>
   );
+}
+
+/** Worktree rows that can ask this Claude agent to switch checkouts. */
+function WorktreeList(props: {
+  worktrees: GitWorktree[];
+  agentId: string;
+  agentStatus: WorktreeActionInput["agentStatus"];
+  provider: string | null;
+  paseo: Paseo;
+  styles: Styles;
+  theme: PluginButtonContentProps["theme"];
+}) {
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const [sending, setSending] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{
+    path: string;
+    ok: boolean;
+    text: string;
+  } | null>(null);
+
+  async function run(action: Extract<WorktreeAction, { kind: "enter" | "exit" }>) {
+    setSending(action.path);
+    setFeedback(null);
+    try {
+      const text =
+        action.kind === "enter"
+          ? enterWorktreePrompt(action.path)
+          : exitWorktreePrompt();
+      await props.paseo.agents.ref(props.agentId).send(text);
+      setFeedback({
+        path: action.path,
+        ok: true,
+        text: "Requested — the agent will switch and confirm.",
+      });
+      setConfirming(null);
+    } catch (error) {
+      setFeedback({ path: action.path, ok: false, text: errorText(error) });
+    } finally {
+      setSending(null);
+    }
+  }
+
+  return (
+    <>
+      {props.worktrees.map((worktree) => {
+        const action = worktreeAction({
+          worktree,
+          agentStatus: props.agentStatus,
+          provider: props.provider,
+        });
+        const isConfirming = confirming === worktree.path;
+        const isSending = sending === worktree.path;
+        const rowFeedback =
+          feedback?.path === worktree.path ? feedback : null;
+        return (
+          <View key={worktree.path} style={props.styles.worktreeBlock}>
+            <View style={props.styles.worktreeRow}>
+              <Text
+                style={[
+                  props.styles.worktreeDot,
+                  {
+                    color: worktree.isCurrent
+                      ? props.theme.colors.accent
+                      : props.theme.colors.foregroundMuted,
+                  },
+                ]}
+              >
+                {worktree.isCurrent ? "●" : "○"}
+              </Text>
+              <Text
+                style={
+                  worktree.isCurrent
+                    ? props.styles.worktreeCurrent
+                    : props.styles.worktreeNameRow
+                }
+                numberOfLines={1}
+              >
+                {worktree.name}
+              </Text>
+              <Text style={props.styles.worktreeBranch} numberOfLines={1}>
+                {worktree.branch ??
+                  (worktree.head ? `@${worktree.head.slice(0, 7)}` : "")}
+              </Text>
+              {worktree.isMain ? (
+                <Text style={props.styles.worktreeTag}>main</Text>
+              ) : null}
+              {action.kind === "blocked" ? (
+                <Text style={props.styles.worktreeHint}>
+                  {action.reason === "busy" ? "agent running" : "Claude only"}
+                </Text>
+              ) : action.kind === "none" ? null : isConfirming ? (
+                <>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Confirm ${actionLabel(action)} ${worktree.name}`}
+                    disabled={sending !== null}
+                    onPress={() => void run(action)}
+                    hitSlop={6}
+                  >
+                    <Text
+                      style={[
+                        props.styles.worktreeAction,
+                        isSending && props.styles.worktreeActionMuted,
+                      ]}
+                    >
+                      {isSending ? "Sending…" : "Confirm"}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Cancel worktree switch"
+                    onPress={() => setConfirming(null)}
+                    hitSlop={6}
+                  >
+                    <Text style={props.styles.worktreeHint}>Cancel</Text>
+                  </Pressable>
+                </>
+              ) : (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`${actionLabel(action)} ${worktree.name}`}
+                  onPress={() => setConfirming(worktree.path)}
+                  hitSlop={6}
+                >
+                  <Text style={props.styles.worktreeAction}>
+                    {actionLabel(action)}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+            {rowFeedback ? (
+              <Text
+                style={
+                  rowFeedback.ok
+                    ? props.styles.mutedSmall
+                    : props.styles.error
+                }
+              >
+                {rowFeedback.text}
+              </Text>
+            ) : null}
+          </View>
+        );
+      })}
+    </>
+  );
+}
+
+function actionLabel(action: WorktreeAction): string {
+  return action.kind === "exit" ? "Exit" : "Enter";
 }
 
 function Section(props: {
@@ -486,6 +655,7 @@ function createStyles(
       width: 26,
     },
     filePath: { color: colors.foreground, fontSize: 11, flexShrink: 1 },
+    worktreeBlock: { gap: 2 },
     worktreeRow: {
       flexDirection: "row" as const,
       alignItems: "center" as const,
@@ -512,6 +682,13 @@ function createStyles(
       borderRadius: 4,
       backgroundColor: colors.surface2,
     },
+    worktreeHint: { color: colors.foregroundMuted, fontSize: 10 },
+    worktreeAction: {
+      color: colors.accent,
+      fontSize: 11,
+      fontWeight: "600" as const,
+    },
+    worktreeActionMuted: { opacity: 0.6 },
     footer: {
       flexDirection: "row" as const,
       alignItems: "center" as const,

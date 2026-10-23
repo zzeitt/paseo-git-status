@@ -27,13 +27,18 @@ export function useWorkspaceInfo(workspaceId: string): WorkspaceInfo | null {
 
 export function useGitStatus(
   directory: string | undefined,
+  agentId: string | undefined,
   intervalMs: number,
   enabled = true,
 ) {
   const callGetGitStatus = useRpc(gitStatusRpc);
   return useQuery({
-    queryKey: ["paseo-git-status", directory],
-    queryFn: () => callGetGitStatus({ directory: directory as string }),
+    queryKey: ["paseo-git-status", directory, agentId ?? ""],
+    queryFn: () =>
+      callGetGitStatus({
+        directory: directory as string,
+        ...(agentId ? { agentId } : {}),
+      }),
     enabled: enabled && Boolean(directory),
     refetchInterval: intervalMs,
     staleTime: Math.max(500, intervalMs - 1_000),

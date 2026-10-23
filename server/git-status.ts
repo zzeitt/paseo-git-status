@@ -14,6 +14,7 @@ import {
   summarize,
   type PorcelainStatus,
 } from "../shared/parse";
+import { resolveLiveCwd } from "./live-cwd";
 
 interface GitResult {
   stdout: string;
@@ -71,7 +72,16 @@ async function tryGit(
   }
 }
 
-function emptyStatus(error: string | null): GitStatus {
+interface StatusDirectories {
+  directory: string;
+  paseoDirectory: string;
+  liveCwd: string | null;
+}
+
+function emptyStatus(
+  error: string | null,
+  directories: StatusDirectories,
+): GitStatus {
   const status: PorcelainStatus = {
     head: null,
     branch: null,
@@ -84,6 +94,7 @@ function emptyStatus(error: string | null): GitStatus {
     ignored: [],
   };
   return {
+    ...directories,
     isGit: false,
     current: null,
     worktrees: [],
@@ -120,10 +131,18 @@ function detectOperation(gitDir: string | null): GitStatus["operation"] {
 
 export async function getGitStatus({
   directory,
+  agentId,
 }: RpcInput<typeof gitStatusRpc>): Promise<GitStatus> {
-  const resolved = path.resolve(directory);
+  const paseoDirectory = path.resolve(directory);
+  const liveCwd = agentId ? resolveLiveCwd(agentId) : null;
+  const resolved = liveCwd ?? paseoDirectory;
+  const directories: StatusDirectories = {
+    directory: resolved,
+    paseoDirectory,
+    liveCwd,
+  };
   if (!fs.existsSync(resolved)) {
-    return emptyStatus("Directory does not exist.");
+    return emptyStatus("Directory does not exist.", directories);
   }
 
   spawnError = null;
@@ -135,7 +154,7 @@ export async function getGitStatus({
   const isBare = bareRepository?.trim() === "true";
   const isGit = inside?.trim() === "true" || isBare;
   if (!isGit) {
-    return emptyStatus(spawnError);
+    return emptyStatus(spawnError, directories);
   }
 
   const [toplevelOut, gitDirOut, statusOut, worktreeOut, logOut, stashOut] =
@@ -209,6 +228,7 @@ export async function getGitStatus({
     : 0;
 
   return {
+    ...directories,
     isGit: true,
     current,
     worktrees,

@@ -52,6 +52,7 @@ function createPillIcon(registration: RegistrationBox) {
       directory === workspace?.directory;
     const query = useGitStatus(
       directory,
+      agentId || undefined,
       PILL_POLL_MS,
       Boolean(directory) && !definitelyNotGit,
     );
@@ -158,7 +159,13 @@ export function contributePills(client: PluginClientContext) {
         title: "Git status",
         label: "Git",
         icon: createPillIcon(box),
-        behavior: { kind: "popover", Content: GitStatusPopover },
+        behavior: {
+          kind: "popover",
+          // The popover needs the client to ask the agent to switch worktrees.
+          Content: (props) => (
+            <GitStatusPopover {...props} paseo={client.paseo} />
+          ),
+        },
       },
     });
     const hiddenByWorkspace =

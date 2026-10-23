@@ -32,15 +32,24 @@ export const operationSchema = z.enum([
 ]);
 
 /**
- * Reads one directory's git state. The directory is the Paseo workspace
- * directory, which is the worktree the agent's conversation belongs to.
+ * Reads one directory's git state. The directory is the Paseo-recorded agent
+ * directory; when `agentId` is present the daemon also looks up the agent's
+ * live directory in its Claude session transcript, because EnterWorktree moves
+ * the session without updating Paseo's copy.
  */
 export const gitStatusRpc = defineRpc({
   name: "gitstatus.get",
   input: z.object({
     directory: z.string().min(1),
+    agentId: z.string().optional(),
   }),
   output: z.object({
+    /** The directory the status was read from (the live one when known). */
+    directory: z.string(),
+    /** The directory Paseo recorded for the agent or workspace. */
+    paseoDirectory: z.string(),
+    /** The agent's live directory from its Claude transcript, when known. */
+    liveCwd: z.string().nullable(),
     isGit: z.boolean(),
     current: worktreeSchema.nullable(),
     worktrees: z.array(worktreeSchema),
