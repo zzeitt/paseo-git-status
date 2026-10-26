@@ -6,7 +6,11 @@ import type {
 import { useAgent } from "@getpaseo/plugin/client";
 import { Icon } from "@getpaseo/plugin/client/react-native";
 import { useEffect } from "react";
-import { formatPillLabel, resolveGitDirectory } from "../shared/parse";
+import {
+  formatPillLabel,
+  formatPillTitle,
+  resolveGitDirectory,
+} from "../shared/parse";
 import { PILL_POLL_MS, useGitStatus, useWorkspaceInfo } from "./git-status-query";
 import { GitStatusPopover } from "./popover";
 
@@ -73,6 +77,20 @@ function createPillIcon(registration: RegistrationBox) {
           })
         : "Git";
 
+    // The track clips the label, so the untruncated identity travels in the
+    // button title: a native tooltip where the host renders one, and the
+    // accessible name everywhere.
+    const title =
+      status?.isGit && current
+        ? formatPillTitle({
+            worktreeName: current.name,
+            branch: current.branch,
+            head: current.head,
+            detached: current.detached,
+            path: current.path,
+          })
+        : "Git status";
+
     useEffect(() => {
       if (definitelyNotGit) {
         registration.current?.update({ visible: false });
@@ -85,10 +103,10 @@ function createPillIcon(registration: RegistrationBox) {
         registration.current?.update({ visible: false });
         return;
       }
-      // Label-only, mirroring paseo-skills: a broader patch rebuilds the
-      // button instead of updating it in place.
-      registration.current?.update({ label });
-    }, [definitelyNotGit, status, label]);
+      // Label and title only, mirroring paseo-skills: a broader patch rebuilds
+      // the button instead of updating it in place.
+      registration.current?.update({ label, title });
+    }, [definitelyNotGit, status, label, title]);
 
     return <Icon name="GitBranch" size={size} color={color} />;
   };

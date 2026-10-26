@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   formatPillLabel,
+  formatPillTitle,
   parsePorcelainV2,
   parseWorktreeList,
   resolveGitDirectory,
@@ -304,6 +305,32 @@ test("formats a detached HEAD and an empty repository", () => {
       conflicted: 0,
     }),
     "repo · main",
+  );
+});
+
+test("the pill title keeps the full worktree, branch, and path", () => {
+  assert.equal(
+    formatPillTitle({
+      worktreeName: "a-very-long-worktree-name",
+      branch: "feature/a-very-long-branch-name",
+      head: OID,
+      detached: false,
+      path: "C:/repo/worktrees/a-very-long-worktree-name",
+    }),
+    "a-very-long-worktree-name · feature/a-very-long-branch-name — C:/repo/worktrees/a-very-long-worktree-name",
+  );
+});
+
+test("the pill title shows the short commit for a detached head", () => {
+  assert.equal(
+    formatPillTitle({
+      worktreeName: "wt",
+      branch: null,
+      head: OID,
+      detached: true,
+      path: "C:/repo/wt",
+    }),
+    "wt · @1111111 — C:/repo/wt",
   );
 });
 

@@ -307,3 +307,21 @@ export function formatPillLabel(input: PillLabelInput): string {
 function truncate(value: string, max: number): string {
   return value.length > max ? `${value.slice(0, max - 1)}…` : value;
 }
+
+export interface PillTitleInput {
+  worktreeName: string;
+  branch: string | null;
+  head: string | null;
+  detached: boolean;
+  path: string;
+}
+
+/**
+ * The pill's accessible name and native tooltip: the untruncated worktree,
+ * branch, and absolute path, because the composer track clips the label.
+ */
+export function formatPillTitle(input: PillTitleInput): string {
+  const branch =
+    input.branch ?? (input.head ? `@${input.head.slice(0, 7)}` : "(no commits)");
+  return `${input.worktreeName} · ${branch} — ${input.path}`;
+}

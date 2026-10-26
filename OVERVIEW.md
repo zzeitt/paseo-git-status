@@ -12,6 +12,8 @@ The pill follows the live session directory. Paseo records an agent's cwd when i
 
 Clicking a worktree row offers to switch: Enter asks the agent to call EnterWorktree for a linked worktree, Exit asks for ExitWorktree back to the main one. The plugin sends a normal user message, so the switch is visible in the conversation and costs one turn. A second click confirms, and the action is only offered for an idle Claude agent.
 
+Worktree and branch names that do not fit stay readable: hovering or tapping the name part of a row reveals the full path and branch, and the pill's title carries the full worktree, branch, and path for tooltips and screen readers.
+
 The plugin reads git locally through the `git` executable on the daemon machine. It does not run git write operations, contact a remote, or fetch. Status is refreshed every five seconds while the composer is visible and every three seconds while the popover is open.
 
 The pill is hidden for workspaces Paseo identifies as non-git, and it hides itself if a directory turns out not to be a repository. Git must be installed and available on the daemon's PATH. Paseo 0.11.4 or later is required on the daemon and on the client showing the composer.

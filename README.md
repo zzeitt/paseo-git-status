@@ -11,6 +11,7 @@ The pill is registered per agent, so it answers the question that matters while 
 - Non-git workspaces hide the pill.
 - The popover shows the current worktree path and whether it is the main or a linked worktree, every worktree in the repository, branch and upstream state, staged/unstaged/untracked/conflicted files, the last commit, the stash count, and any merge, rebase, cherry-pick, revert, or bisect in progress.
 - Click a worktree row to ask the agent to switch: **Enter** for a linked worktree, **Exit** to return to the main one. The plugin sends a normal user message, so the switch is visible in the conversation and costs one turn; it needs a second click to confirm and is offered only for an idle Claude agent.
+- Long worktree and branch names never have to stay truncated: hover or tap the name part of a worktree row to reveal its full absolute path and branch, selectable for copying. The pill's title also carries the untruncated `worktree · branch — path`, so hosts that render button titles as tooltips show it on hover and screen readers always get the full identity.
 - Status is polled every five seconds while the composer is visible and every three seconds while the popover is open. The plugin only reads git state; it never runs git write operations and makes no network requests. The one message it can send is the worktree switch you confirm.
 
 ## Requirements

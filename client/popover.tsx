@@ -150,7 +150,12 @@ function Body(props: {
           ) : null}
         </View>
         {current ? (
-          <Text style={styles.path} selectable numberOfLines={2}>
+          <Text
+            style={styles.path}
+            selectable
+            numberOfLines={2}
+            ellipsizeMode="middle"
+          >
             {current.path}
           </Text>
         ) : null}
@@ -313,6 +318,9 @@ function WorktreeList(props: {
 }) {
   const [confirming, setConfirming] = useState<string | null>(null);
   const [sending, setSending] = useState<string | null>(null);
+  // Hover shows the full name on desktop; a tap toggles it on touch devices.
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [hovered, setHovered] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{
     path: string;
     ok: boolean;
@@ -351,10 +359,19 @@ function WorktreeList(props: {
         });
         const isConfirming = confirming === worktree.path;
         const isSending = sending === worktree.path;
+        const showDetail =
+          expanded === worktree.path || hovered === worktree.path;
         const rowFeedback =
           feedback?.path === worktree.path ? feedback : null;
         return (
-          <View key={worktree.path} style={props.styles.worktreeBlock}>
+          <View
+            key={worktree.path}
+            style={props.styles.worktreeBlock}
+            onPointerEnter={() => setHovered(worktree.path)}
+            onPointerLeave={() =>
+              setHovered((value) => (value === worktree.path ? null : value))
+            }
+          >
             <View style={props.styles.worktreeRow}>
               <Text
                 style={[
@@ -368,20 +385,37 @@ function WorktreeList(props: {
               >
                 {worktree.isCurrent ? "●" : "○"}
               </Text>
-              <Text
-                style={
-                  worktree.isCurrent
-                    ? props.styles.worktreeCurrent
-                    : props.styles.worktreeNameRow
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Show full details for ${worktree.name}`}
+                accessibilityHint="Shows the absolute path and the full branch name"
+                onPress={() =>
+                  setExpanded((value) =>
+                    value === worktree.path ? null : worktree.path,
+                  )
                 }
-                numberOfLines={1}
+                style={props.styles.worktreeNames}
               >
-                {worktree.name}
-              </Text>
-              <Text style={props.styles.worktreeBranch} numberOfLines={1}>
-                {worktree.branch ??
-                  (worktree.head ? `@${worktree.head.slice(0, 7)}` : "")}
-              </Text>
+                <Text
+                  style={
+                    worktree.isCurrent
+                      ? props.styles.worktreeCurrent
+                      : props.styles.worktreeNameRow
+                  }
+                  numberOfLines={2}
+                  ellipsizeMode="middle"
+                >
+                  {worktree.name}
+                </Text>
+                <Text
+                  style={props.styles.worktreeBranch}
+                  numberOfLines={1}
+                  ellipsizeMode="middle"
+                >
+                  {worktree.branch ??
+                    (worktree.head ? `@${worktree.head.slice(0, 7)}` : "")}
+                </Text>
+              </Pressable>
               {worktree.isMain ? (
                 <Text style={props.styles.worktreeTag}>main</Text>
               ) : null}
@@ -429,6 +463,28 @@ function WorktreeList(props: {
                 </Pressable>
               )}
             </View>
+            {showDetail ? (
+              <View style={props.styles.worktreeDetail}>
+                <Text
+                  style={props.styles.worktreeDetailText}
+                  selectable
+                  numberOfLines={3}
+                >
+                  {worktree.path}
+                </Text>
+                <Text
+                  style={props.styles.worktreeDetailText}
+                  selectable
+                  numberOfLines={2}
+                >
+                  {worktree.branch
+                    ? `branch ${worktree.branch}`
+                    : worktree.head
+                      ? `detached at ${worktree.head}`
+                      : "no commits"}
+                </Text>
+              </View>
+            ) : null}
             {rowFeedback ? (
               <Text
                 style={
@@ -661,6 +717,15 @@ function createStyles(
       alignItems: "center" as const,
       gap: 6,
     },
+    worktreeNames: {
+      flexDirection: "row" as const,
+      alignItems: "center" as const,
+      gap: 6,
+      flexShrink: 1,
+      flexGrow: 1,
+    },
+    worktreeDetail: { gap: 1, paddingLeft: 18, paddingVertical: 2 },
+    worktreeDetailText: { color: colors.foregroundMuted, fontSize: 10 },
     worktreeDot: { fontSize: 10, width: 12, textAlign: "center" as const },
     worktreeCurrent: {
       color: colors.foreground,
